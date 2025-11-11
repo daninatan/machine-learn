@@ -1,0 +1,107 @@
+UF
+
+NH.TMED < 10 [sum]
+
+ND.TMIN < 10 [sum]
+
+Altitude Média [classe]
+
+Semeadura [data]
+
+Colheita [data]
+
+Genótipos Propósito
+
+Tipo Safra
+
+Solo Textura
+
+Talhão
+
+Solo Grupo
+
+Amplitute Térmica [soma]
+
+Temperatura Ar Mínima [soma]
+
+Temperatura Ar Máxima [soma]
+
+Fotoperíodo [soma]
+
+Genótipos
+
+Precipitação [soma]
+
+Graus Dias [soma]
+
+Temperatura Ar [soma]
+
+Umidade Relativa Máxima [soma]
+
+Umidade Relativa Mínima [soma]
+
+Umidade Relativa [soma]
+
+Radiação Solar [soma]
+
+Evapotranspiração Potencial PM [soma]
+
+Evapotranspiração Potencial PM2 [soma]
+
+Temperatura Orvalho [soma]
+
+Temperatura Ar Noturna [°C]
+
+Temperatura Molhamento Foliar [soma]
+
+Altitude Máxima [m]
+
+Altitude Média [m]
+
+Altitude Mínima [m]
+
+NH.UR > 90 [sum]
+
+Ciclo Semeadura Colheita [dias]
+
+Fungicida Planejado [aplicações]
+
+Herbicida Planejado [aplicações]
+
+Inseticida Planejado [aplicações]
+
+ND.UR < 60 [sum]
+
+ND.UR > 80 [sum]
+
+ND.UR > 90 [sum]
+
+NH.UR < 60 [sum]
+
+Talhão Latitude [grau decimal]
+
+Talhão Longitude [grau decimal]
+
+Colheita [decendio]
+
+ND.RAD < 10 [sum]
+
+ND.PREC > 5 [sum]
+
+NH.RAD > 800 [sum]
+
+Semeadura [decendio]
+
+ND.PREC = 0.0 [sum]
+
+ND.TMAX > 30 [sum]
+
+ND.PREC > 0.2 [sum]
+
+ND.RAD > 20 [sum]
+
+NH.RAD > 1000 [sum]
+
+NH.RAD > 600 [sum]
+
+Produtividade Realizada [kg/ha]
