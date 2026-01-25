@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 from sklearn.neural_network import MLPRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
@@ -222,7 +223,8 @@ def initialize_population(n, n_population, population):
         individual = Individual(bits)
         population.append(individual)
 
-def calculate_fitness(population, estimator):
+#weighted sum between classification score and number of attributes
+def calculate_fitness(population, estimator, fsw, faw):
     if estimator == "mlp":
         for individual in population:
 
@@ -230,11 +232,6 @@ def calculate_fitness(population, estimator):
                 individual.chromosome,
                 base_abc_X.columns
             )
-
-            # evita cromossomo vazio
-            if len(selected_cols) == 0:
-                individual.fitness = -1e9
-                continue
 
             preprocessador = build_preprocessor(selected_cols)
 
@@ -245,8 +242,16 @@ def calculate_fitness(population, estimator):
                 ('regressor', MLPRegressor())
             ])
 
-            mlp_pipeline.fit(X_train, y_train)
-            individual.fitness = mlp_pipeline.score(X_test, y_test)
+            scores = cross_val_score(
+                mlp_pipeline,
+                X_train,
+                y_train,
+                cv=5,
+                n_jobs = -1
+            )
+
+            score = scores.mean()
+            individual.fitness = fsw * (score) + faw * ((individual.chromosome.count(0) / len(individual.chromosome)))
 
     elif estimator == "knn":
         for individual in population:
@@ -256,22 +261,26 @@ def calculate_fitness(population, estimator):
                 base_abc_X.columns
             )
 
-            # evita cromossomo vazio
-            if len(selected_cols) == 0:
-                individual.fitness = -1e9
-                continue
-
             preprocessador = build_preprocessor(selected_cols)
 
             knn_pipeline = Pipeline(steps=[
                 ('selector', FeatureSelector(selected_cols)),
                 ('preprocessamento', preprocessador),
                 ('scaler', StandardScaler(with_mean=False)),
-                ('regressor', KNeighborsRegressor())
+                ('regressor', KNeighborsRegressor(n_jobs=1))
             ])
 
-            knn_pipeline.fit(X_train, y_train)
-            individual.fitness = knn_pipeline.score(X_test, y_test)
+            scores = cross_val_score(
+                knn_pipeline,
+                X_train,
+                y_train,
+                cv=5,
+                n_jobs = -1
+            )
+
+            score = scores.mean()
+            individual.fitness = fsw * (score) + faw * ((individual.chromosome.count(0) / len(individual.chromosome)))
+
     elif estimator == "dt":
         for individual in population:
 
@@ -280,22 +289,25 @@ def calculate_fitness(population, estimator):
                 base_abc_X.columns
             )
 
-            # evita cromossomo vazio
-            if len(selected_cols) == 0:
-                individual.fitness = -1e9
-                continue
-
             preprocessador = build_preprocessor(selected_cols)
 
             dt_pipeline = Pipeline(steps=[
                 ('selector', FeatureSelector(selected_cols)),
                 ('preprocessamento', preprocessador),
                 ('scaler', StandardScaler(with_mean=False)),
-                ('regressor', DecisionTreeRegressor())
+                ('regressor', DecisionTreeRegressor(n_jobs=1))
             ])
 
-            dt_pipeline.fit(X_train, y_train)
-            individual.fitness = dt_pipeline.score(X_test, y_test)
+            scores = cross_val_score(
+                dt_pipeline,
+                X_train,
+                y_train,
+                cv=5,
+                n_jobs = -1
+            )
+
+            score = scores.mean()
+            individual.fitness = fsw * (score) + faw * ((individual.chromosome.count(0) / len(individual.chromosome)))
 
     elif estimator == "rf":
         for individual in population:
@@ -305,22 +317,25 @@ def calculate_fitness(population, estimator):
                 base_abc_X.columns
             )
 
-            # evita cromossomo vazio
-            if len(selected_cols) == 0:
-                individual.fitness = -1e9
-                continue
-
             preprocessador = build_preprocessor(selected_cols)
 
             rf_pipeline = Pipeline(steps=[
                 ('selector', FeatureSelector(selected_cols)),
                 ('preprocessamento', preprocessador),
                 ('scaler', StandardScaler(with_mean=False)),
-                ('regressor', RandomForestRegressor())
+                ('regressor', RandomForestRegressor(n_jobs = 1))
             ])
 
-            rf_pipeline.fit(X_train, y_train)
-            individual.fitness = rf_pipeline.score(X_test, y_test)
+            scores = cross_val_score(
+                rf_pipeline,
+                X_train,
+                y_train,
+                cv=5,
+                n_jobs = -1
+            )
+
+            score = scores.mean()
+            individual.fitness = fsw * (score) + faw * ((individual.chromosome.count(0) / len(individual.chromosome)))
 
 def generate_offspring(p1, p2, crossing_probability):
     o1 = Individual()
@@ -360,18 +375,127 @@ def select_parent(population):
         if r <= cumulative:
             return individual
 
-population = []
+#================MLP====================
+def mlp_ag(n, n_population, knn_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw):
+    initialize_population(n, n_population, mlp_population)
+    calculate_fitness(mlp_population, "mlp", fsw, faw)
+    mlp_population = sorted(mlp_population, key=lambda p: p.fitness)
+    apply_probability(mlp_population, s)
+
+    while generations < max_generations:
+            new_population = []
+
+            #print(mlp_population[len(mlp_population) - 1].chromosome)
+            
+            for i in range(elitism_number):
+                new_population.append(
+                    Individual(mlp_population[-1 - i].chromosome)
+                )
+
+
+            for i in range(int((n_population - elitism_number) / 2)):
+                p1 = select_parent(mlp_population)
+                p2 = select_parent(mlp_population)
+                f1, f2 = generate_offspring(p1, p2, crossing_probability)
+                apply_mutation(f1, mutation_probability)
+                apply_mutation(f2, mutation_probability)
+                new_population.append(f1)
+                new_population.append(f2)
+            mlp_population = new_population
+            calculate_fitness(mlp_population, "mlp", fsw, faw)
+            mlp_population = sorted(mlp_population, key=lambda p: p.fitness)
+            apply_probability(mlp_population, s)
+            generations += 1
+            
+    best = mlp_population[len(mlp_population) - 1]
+    return best
+
+#===================KNN====================
+def knn_ag(n, n_population, knn_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw):
+    initialize_population(n, n_population, knn_population)
+    calculate_fitness(knn_population, "knn", fsw, faw)
+    knn_population = sorted(knn_population, key=lambda p: p.fitness)
+    apply_probability(knn_population, s)
+
+    while generations < max_generations:
+            print("Generation: ", generations + 1)
+            new_population = []
+
+            #print(knn_population[len(knn_population) - 1].chromosome)
+            
+            for i in range(elitism_number):
+                new_population.append(
+                    Individual(knn_population[-1 - i].chromosome)
+                )
+
+
+            for i in range(int((n_population - elitism_number) / 2)):
+                p1 = select_parent(knn_population)
+                p2 = select_parent(knn_population)
+                f1, f2 = generate_offspring(p1, p2, crossing_probability)
+                apply_mutation(f1, mutation_probability)
+                apply_mutation(f2, mutation_probability)
+                new_population.append(f1)
+                new_population.append(f2)
+            knn_population = new_population
+            calculate_fitness(knn_population, "knn", fsw, faw)
+            knn_population = sorted(knn_population, key=lambda p: p.fitness)
+            apply_probability(knn_population, s)
+            generations += 1
+            
+    best = knn_population[len(knn_population) - 1]
+    return best
+
+def print_selected_attributes(individual, X_train):
+    individual = np.asarray(individual).ravel().astype(bool)
+    nomes_variaveis = X_train.columns[individual == 1]
+
+    assert individual.ndim == 1
+    assert len(individual) == X_train.shape[1]
+
+    print("\n\nAtributos: ", len(nomes_variaveis), "\n\n")
+    for nome in nomes_variaveis:
+        print(nome)
+
+
+mlp_population = []
+knn_population = []
+dt_population = []
+rf_population = []
 new_population = []
 n = len(base_abc_X.columns)
-n_population = 2
+n_population = 100
 crossing_probability = 80
-elitism_number = 20
-mutation_probability = 2
+elitism_number = 10
+mutation_probability = 1
 s = 1.7
-max_generations = 10000
+max_generations = 50
 generations = 0
 
-initialize_population(n, n_population, population)
-calculate_fitness(population, "mlp")
-for individual in population:
-    print(individual.fitness)
+#fitness scorw weight and fitness attribute weight
+fsw = 0.9
+faw = 0.1
+
+knn_best = knn_ag(n, n_population, knn_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw)
+
+knn_selected_cols = chromosome_to_columns(
+                knn_best.chromosome,
+                base_abc_X.columns
+            )
+
+knn_preprocessador = build_preprocessor(knn_selected_cols)
+
+knn_best__pipeline = Pipeline(steps=[
+                ('selector', FeatureSelector(knn_selected_cols)),
+                ('preprocessamento', knn_preprocessador),
+                ('scaler', StandardScaler(with_mean=False)),
+                ('regressor', KNeighborsRegressor(n_jobs= -1))
+            ])
+
+knn_best__pipeline.fit(X_train, y_train)
+
+knn_best_pipeline_score = knn_best__pipeline.score(X_test, y_test)
+
+print_selected_attributes(knn_best.chromosome, X_train)
+
+print("\nScore: ", knn_best_pipeline_score)
