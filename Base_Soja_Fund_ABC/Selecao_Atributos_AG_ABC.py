@@ -294,8 +294,7 @@ def calculate_fitness(population, estimator, fsw, faw):
             dt_pipeline = Pipeline(steps=[
                 ('selector', FeatureSelector(selected_cols)),
                 ('preprocessamento', preprocessador),
-                ('scaler', StandardScaler(with_mean=False)),
-                ('regressor', DecisionTreeRegressor(n_jobs=1))
+                ('regressor', DecisionTreeRegressor())
             ])
 
             scores = cross_val_score(
@@ -311,26 +310,29 @@ def calculate_fitness(population, estimator, fsw, faw):
 
     elif estimator == "rf":
         for individual in population:
-
             selected_cols = chromosome_to_columns(
                 individual.chromosome,
                 base_abc_X.columns
             )
 
             preprocessador = build_preprocessor(selected_cols)
-
             rf_pipeline = Pipeline(steps=[
                 ('selector', FeatureSelector(selected_cols)),
                 ('preprocessamento', preprocessador),
-                ('scaler', StandardScaler(with_mean=False)),
-                ('regressor', RandomForestRegressor(n_jobs = 1))
+                ('regressor', RandomForestRegressor(
+                                n_estimators=30,
+                                max_depth=10,
+                                min_samples_leaf=5,
+                                n_jobs=1,
+                                random_state=42
+                ))
             ])
 
             scores = cross_val_score(
                 rf_pipeline,
                 X_train,
                 y_train,
-                cv=5,
+                cv=3,
                 n_jobs = -1
             )
 
@@ -374,9 +376,20 @@ def select_parent(population):
         cumulative += individual.prob
         if r <= cumulative:
             return individual
+        
+def print_selected_attributes(individual, X_train):
+    individual = np.asarray(individual).ravel().astype(bool)
+    nomes_variaveis = X_train.columns[individual == 1]
+
+    assert individual.ndim == 1
+    assert len(individual) == X_train.shape[1]
+
+    print("\n\nAtributos: ", len(nomes_variaveis), "\n\n")
+    for nome in nomes_variaveis:
+        print(nome)
 
 #================MLP====================
-def mlp_ag(n, n_population, knn_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw):
+def mlp_ag(n, n_population, mlp_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw):
     initialize_population(n, n_population, mlp_population)
     calculate_fitness(mlp_population, "mlp", fsw, faw)
     mlp_population = sorted(mlp_population, key=lambda p: p.fitness)
@@ -384,8 +397,6 @@ def mlp_ag(n, n_population, knn_population, new_population, generations, max_gen
 
     while generations < max_generations:
             new_population = []
-
-            #print(mlp_population[len(mlp_population) - 1].chromosome)
             
             for i in range(elitism_number):
                 new_population.append(
@@ -407,8 +418,29 @@ def mlp_ag(n, n_population, knn_population, new_population, generations, max_gen
             apply_probability(mlp_population, s)
             generations += 1
             
-    best = mlp_population[len(mlp_population) - 1]
-    return best
+    mlp_best = mlp_population[len(mlp_population) - 1]
+    mlp_selected_cols = chromosome_to_columns(
+                    mlp_best.chromosome,
+                    base_abc_X.columns
+                )
+
+    mlp_preprocessador = build_preprocessor(mlp_selected_cols)
+
+    mlp_best__pipeline = Pipeline(steps=[
+                    ('selector', FeatureSelector(mlp_selected_cols)),
+                ('preprocessamento', mlp_preprocessador),
+                    ('scaler', StandardScaler(with_mean=False)),
+                    ('regressor', MLPRegressor())
+                ])
+
+    mlp_best__pipeline.fit(X_train, y_train)
+
+    mlp_best_pipeline_score = mlp_best__pipeline.score(X_test, y_test)
+
+    print("\nMLP Attributes: \n")
+    print_selected_attributes(mlp_best.chromosome, X_train)
+
+    print("\nScore: ", mlp_best_pipeline_score)
 
 #===================KNN====================
 def knn_ag(n, n_population, knn_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw):
@@ -443,19 +475,142 @@ def knn_ag(n, n_population, knn_population, new_population, generations, max_gen
             apply_probability(knn_population, s)
             generations += 1
             
-    best = knn_population[len(knn_population) - 1]
-    return best
+    knn_best = knn_population[len(knn_population) - 1]
+    knn_selected_cols = chromosome_to_columns(
+                knn_best.chromosome,
+                base_abc_X.columns
+            )
 
-def print_selected_attributes(individual, X_train):
-    individual = np.asarray(individual).ravel().astype(bool)
-    nomes_variaveis = X_train.columns[individual == 1]
+    knn_preprocessador = build_preprocessor(knn_selected_cols)
 
-    assert individual.ndim == 1
-    assert len(individual) == X_train.shape[1]
+    knn_best__pipeline = Pipeline(steps=[
+                    ('selector', FeatureSelector(knn_selected_cols)),
+                    ('preprocessamento', knn_preprocessador),
+                    ('scaler', StandardScaler(with_mean=False)),
+                    ('regressor', KNeighborsRegressor(n_jobs= -1))
+                ])
 
-    print("\n\nAtributos: ", len(nomes_variaveis), "\n\n")
-    for nome in nomes_variaveis:
-        print(nome)
+    knn_best__pipeline.fit(X_train, y_train)
+
+    knn_best_pipeline_score = knn_best__pipeline.score(X_test, y_test)
+
+    print("\nKNN Attributes: \n")
+    print_selected_attributes(knn_best.chromosome, X_train)
+
+    print("\nScore: ", knn_best_pipeline_score, "\n\n")
+
+#=============DT=================
+def dt_ag(n, n_population, dt_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw):
+    initialize_population(n, n_population, dt_population)
+    calculate_fitness(dt_population, "dt", fsw, faw)
+    dt_population = sorted(dt_population, key=lambda p: p.fitness)
+    apply_probability(dt_population, s)
+
+    while generations < max_generations:
+            print("Generation: ", generations + 1)
+            new_population = []
+
+            #print(dt_population[len(knn_population) - 1].chromosome)
+            
+            for i in range(elitism_number):
+                new_population.append(
+                    Individual(dt_population[-1 - i].chromosome)
+                )
+
+
+            for i in range(int((n_population - elitism_number) / 2)):
+                p1 = select_parent(dt_population)
+                p2 = select_parent(dt_population)
+                f1, f2 = generate_offspring(p1, p2, crossing_probability)
+                apply_mutation(f1, mutation_probability)
+                apply_mutation(f2, mutation_probability)
+                new_population.append(f1)
+                new_population.append(f2)
+            dt_population = new_population
+            calculate_fitness(dt_population, "dt", fsw, faw)
+            dt_population = sorted(dt_population, key=lambda p: p.fitness)
+            apply_probability(dt_population, s)
+            generations += 1
+            
+    dt_best = dt_population[len(dt_population) - 1]
+    dt_selected_cols = chromosome_to_columns(
+                dt_best.chromosome,
+                base_abc_X.columns
+            )
+
+    dt_preprocessador = build_preprocessor(dt_selected_cols)
+
+    dt_best__pipeline = Pipeline(steps=[
+                    ('selector', FeatureSelector(dt_selected_cols)),
+                    ('preprocessamento', dt_preprocessador),
+                    ('regressor', DecisionTreeRegressor())
+                ])
+
+    dt_best__pipeline.fit(X_train, y_train)
+
+    dt_best_pipeline_score = dt_best__pipeline.score(X_test, y_test)
+
+    print("\nDT Attributes: \n")
+    print_selected_attributes(dt_best.chromosome, X_train)
+
+    print("\nScore: ", dt_best_pipeline_score)
+
+#===================RF====================
+def rf_ag(n, n_population, rf_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw):
+    initialize_population(n, n_population, rf_population)
+    calculate_fitness(rf_population, "rf", fsw, faw)
+    rf_population = sorted(rf_population, key=lambda p: p.fitness)
+    apply_probability(rf_population, s)
+
+    while generations < max_generations:
+            print("Generation: ", generations + 1)
+            new_population = []
+
+            #print(knn_population[len(knn_population) - 1].chromosome)
+            
+            for i in range(elitism_number):
+                new_population.append(
+                    Individual(rf_population[-1 - i].chromosome)
+                )
+
+
+            for i in range(int((n_population - elitism_number) / 2)):
+                p1 = select_parent(rf_population)
+                p2 = select_parent(rf_population)
+                f1, f2 = generate_offspring(p1, p2, crossing_probability)
+                apply_mutation(f1, mutation_probability)
+                apply_mutation(f2, mutation_probability)
+                new_population.append(f1)
+                new_population.append(f2)
+            rf_population = new_population
+            calculate_fitness(rf_population, "rf", fsw, faw)
+            rf_population = sorted(rf_population, key=lambda p: p.fitness)
+            apply_probability(rf_population, s)
+            generations += 1
+            
+    rf_best = rf_population[len(rf_population) - 1]
+    rf_selected_cols = chromosome_to_columns(
+                rf_best.chromosome,
+                base_abc_X.columns
+            )
+
+    rf_preprocessador = build_preprocessor(rf_selected_cols)
+
+    rf_best__pipeline = Pipeline(steps=[
+                    ('selector', FeatureSelector(rf_selected_cols)),
+                    ('preprocessamento', rf_preprocessador),
+                    ('regressor', RandomForestRegressor(n_jobs= -1))
+                ])
+
+    rf_best__pipeline.fit(X_train, y_train)
+
+    rf_best_pipeline_score = rf_best__pipeline.score(X_test, y_test)
+
+    print("\nRF Attributes: \n")
+    print_selected_attributes(rf_best.chromosome, X_train)
+
+    print("\nScore: ", rf_best_pipeline_score)
+
 
 
 mlp_population = []
@@ -467,35 +622,16 @@ n = len(base_abc_X.columns)
 n_population = 100
 crossing_probability = 80
 elitism_number = 10
-mutation_probability = 1
+mutation_probability = 3
 s = 1.7
-max_generations = 50
+max_generations = 100
 generations = 0
 
-#fitness scorw weight and fitness attribute weight
+#fitness score weight and fitness attribute weight
 fsw = 0.9
 faw = 0.1
 
-knn_best = knn_ag(n, n_population, knn_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw)
-
-knn_selected_cols = chromosome_to_columns(
-                knn_best.chromosome,
-                base_abc_X.columns
-            )
-
-knn_preprocessador = build_preprocessor(knn_selected_cols)
-
-knn_best__pipeline = Pipeline(steps=[
-                ('selector', FeatureSelector(knn_selected_cols)),
-                ('preprocessamento', knn_preprocessador),
-                ('scaler', StandardScaler(with_mean=False)),
-                ('regressor', KNeighborsRegressor(n_jobs= -1))
-            ])
-
-knn_best__pipeline.fit(X_train, y_train)
-
-knn_best_pipeline_score = knn_best__pipeline.score(X_test, y_test)
-
-print_selected_attributes(knn_best.chromosome, X_train)
-
-print("\nScore: ", knn_best_pipeline_score)
+#dt_ag(n, n_population, dt_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw)
+#rf_ag(n, n_population, rf_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw)
+#mlp_ag(n, n_population, mlp_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw)
+knn_ag(n, n_population, knn_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw)
