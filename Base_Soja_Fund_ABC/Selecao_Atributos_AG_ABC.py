@@ -237,14 +237,17 @@ def calculate_fitness(population, estimator, fsw, faw):
                 ('selector', FeatureSelector(selected_cols)),
                 ('preprocessamento', preprocessador),
                 ('scaler', StandardScaler(with_mean=False)),
-                ('regressor', MLPRegressor())
+                ('regressor', MLPRegressor(
+                            hidden_layer_sizes=(32,),
+                            max_iter=150,
+                            early_stopping=True,
+                            ))
             ])
 
             scores = cross_val_score(
                 mlp_pipeline,
                 X_train,
                 y_train,
-                cv=5,
                 n_jobs = -1
             )
 
@@ -323,7 +326,7 @@ def calculate_fitness(population, estimator, fsw, faw):
                                 min_samples_leaf=5,
                                 n_jobs=1,
                                 random_state=42
-                ))
+                            ))
             ])
 
             scores = cross_val_score(
@@ -426,7 +429,7 @@ def mlp_ag(n, n_population, mlp_population, new_population, generations, max_gen
 
     mlp_best__pipeline = Pipeline(steps=[
                     ('selector', FeatureSelector(mlp_selected_cols)),
-                ('preprocessamento', mlp_preprocessador),
+                    ('preprocessamento', mlp_preprocessador),
                     ('scaler', StandardScaler(with_mean=False)),
                     ('regressor', MLPRegressor())
                 ])
@@ -631,5 +634,5 @@ faw = 0.1
 
 #dt_ag(n, n_population, dt_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw)
 #rf_ag(n, n_population, rf_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw)
-#mlp_ag(n, n_population, mlp_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw)
-knn_ag(n, n_population, knn_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw)
+mlp_ag(n, n_population, mlp_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw)
+#knn_ag(n, n_population, knn_population, new_population, generations, max_generations, elitism_number, crossing_probability, mutation_probability, s, fsw, faw)
