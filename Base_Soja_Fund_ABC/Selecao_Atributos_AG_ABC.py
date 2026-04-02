@@ -14,7 +14,7 @@ from sklearn.preprocessing import OneHotEncoder
 import random
 from sklearn.base import BaseEstimator, TransformerMixin
 
-class FeatureSelector(BaseEstimator, TransformerMixin):
+class FeatureSelector():
     def __init__(self, selected_columns):
         self.selected_columns = selected_columns
 
