@@ -9,6 +9,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.tree import DecisionTreeRegressor
 from FeatureSelector import FeatureSelector
 from Individual import Individual
+import numpy as np
 
 from PopulationOperators import PopulationOperators
 
@@ -22,8 +23,16 @@ class Model:
 
         self.population_op = PopulationOperators()
 
-    def start(self):
-        self.population_op.initialize_population(self.n, self.n_population, self.population)
+    def print_selected_attributes(self, individual, X_train):
+        individual = np.asarray(individual).ravel().astype(bool)
+        nomes_variaveis = X_train.columns[individual == 1]
+
+        assert individual.ndim == 1
+        assert len(individual) == X_train.shape[1]
+
+        print("\n\nAtributos: ", len(nomes_variaveis), "\n\n")
+        for nome in nomes_variaveis:
+            print(nome)
         
     def chromosome_to_columns(self, chromosome, all_columns):
         return [
@@ -72,7 +81,7 @@ class Model:
 
             selected_cols = self.chromosome_to_columns(
                 individual.chromosome,
-                self.base_abc_X.columns
+                self.X_train.columns
             )
 
             preprocessador = self.build_preprocessor(selected_cols)
@@ -83,7 +92,7 @@ class Model:
                 pipeline,
                 self.X_train,
                 self.y_train,
-                cv=5,
+                cv=cv,
                 n_jobs = -1
             )
 
@@ -153,7 +162,7 @@ class Model:
             # 🔹 Elitismo
             for i in range(self.elitism_number):
                 new_population.append(
-                    Individual(self.population[-1 - i].chromosome)
+                    Individual(self.population[-1 - i].chromosome.copy())
                 )
 
             # 🔹 Reprodução
@@ -184,7 +193,7 @@ class Model:
 
         selected_cols = self.chromosome_to_columns(
             best.chromosome,
-            self.dbConfig.getDatabase().columns
+            self.X_train.columns
         )
 
         preprocessador = self.build_preprocessor(selected_cols)
@@ -204,7 +213,7 @@ class Model:
 
         # ================= RESULTADOS =================
         print(f"\n{self.model.upper()} Attributes:\n")
-        #print_selected_attributes(best.chromosome, self.X_train)
+        self.print_selected_attributes(best.chromosome, self.X_train)
 
         print("\nScore:", score, "\n")
 

@@ -14,13 +14,13 @@ X_train, X_test, y_train, y_test, base_abc_X = dbConfig.configDatabase()
 #rf_population = []
 population = []
 new_population = []
-n = dbConfig.getLen()
+n = len(X_train.columns)
 n_population = 100
 crossing_probability = 80
 elitism_number = 10
 mutation_probability = 3
 s = 1.7
-max_generations = 100
+max_generations = 5
 generations = 0
 model = "knn"
 
@@ -56,8 +56,5 @@ model = Model(
     config=config_ga,
     data=data
 )
-
-model.start()
-
 
 best, score, pipeline = model.run_ag()
