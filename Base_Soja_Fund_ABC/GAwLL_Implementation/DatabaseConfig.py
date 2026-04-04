@@ -137,6 +137,9 @@ class DatabaseConfig:
             base_abc_X[f"{col}_ano"] = base_abc_X[col].dt.year
             base_abc_X[f"{col}_mes"] = base_abc_X[col].dt.month
             base_abc_X[f"{col}_dia"] = base_abc_X[col].dt.day
+
+        base_abc_X = base_abc_X.drop(columns=["Semeadura [data]", "Colheita [data]"])
+        
         #transforma valores que estavam sendo interpretados como str em valores numericos
         for col in self.variaveis_numericas:
             if base_abc_X[col].dtype == "object":

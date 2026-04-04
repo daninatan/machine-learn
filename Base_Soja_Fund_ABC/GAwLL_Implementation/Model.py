@@ -10,29 +10,26 @@ from sklearn.tree import DecisionTreeRegressor
 from FeatureSelector import FeatureSelector
 from Individual import Individual
 import numpy as np
+from LinkageLearning import LinkageLearning
 
 from PopulationOperators import PopulationOperators
 
 class Model:
-    def __init__(self, dbConfig, population, model, config, data):
+    def __init__(self, dbConfig, population, model, config, data, evig, importance):
         self.dbConfig = dbConfig
         self.population = population
         self.model = model
         self.__dict__.update(config)
         self.__dict__.update(data)
+        self.evig = evig
+        self.importance = importance
+        self.linkage = LinkageLearning(
+            evig=self.evig,
+            importance=self.importance,
+            eval_perf_batch=self.evaluate_batch
+        )
 
         self.population_op = PopulationOperators()
-
-    def print_selected_attributes(self, individual, X_train):
-        individual = np.asarray(individual).ravel().astype(bool)
-        nomes_variaveis = X_train.columns[individual == 1]
-
-        assert individual.ndim == 1
-        assert len(individual) == X_train.shape[1]
-
-        print("\n\nAtributos: ", len(nomes_variaveis), "\n\n")
-        for nome in nomes_variaveis:
-            print(nome)
         
     def chromosome_to_columns(self, chromosome, all_columns):
         return [
@@ -68,37 +65,49 @@ class Model:
 
         return ColumnTransformer(transformers)
 
-    def calculate_fitness(self):
-        PIPELINES = {
-            "mlp": (self.create_mlp_pipeline, 5),
-            "knn": (self.create_knn_pipeline, 5),
-            "dt": (self.create_dt_pipeline, 5),
-            "rf": (self.create_rf_pipeline, 3),
-}
-        create_pipeline, cv = PIPELINES[self.model]
-
-        for individual in self.population:
-
-            selected_cols = self.chromosome_to_columns(
+    def evaluate_individual(self, individual : Individual):
+        selected_cols = self.chromosome_to_columns(
                 individual.chromosome,
                 self.X_train.columns
-            )
+        )
 
-            preprocessador = self.build_preprocessor(selected_cols)
+        PIPELINES = {
+            "mlp": (self.create_mlp_pipeline, 3),
+            "knn": (self.create_knn_pipeline, 3),
+            "dt": (self.create_dt_pipeline, 3),
+            "rf": (self.create_rf_pipeline, 3),
+        }
 
-            pipeline = create_pipeline(selected_cols, preprocessador)
+        create_pipeline, cv = PIPELINES[self.model]
 
-            scores = cross_val_score(
-                pipeline,
-                self.X_train,
-                self.y_train,
-                cv=cv,
-                n_jobs = -1
-            )
+        preprocessador = self.build_preprocessor(selected_cols)
 
-            score = scores.mean()
-            individual.fitness = self.fsw * (score) + self.faw * ((individual.chromosome.count(0) / len(individual.chromosome)))
+        pipeline = create_pipeline(selected_cols, preprocessador)
 
+        scores = cross_val_score(
+            pipeline,
+            self.X_train,
+            self.y_train,
+            cv=cv,
+            n_jobs = 1
+        )
+
+        score = scores.mean()
+        fitness = self.fsw * (score) + self.faw * ((individual.chromosome.count(0) / len(individual.chromosome)))
+        return fitness
+    
+    def evaluate_batch(self, chromosomes):
+        fitness = []
+        for chrom in chromosomes:
+            ind = Individual(chrom)
+            fitness.append(self.evaluate_individual(ind))
+        return fitness
+            
+
+    def calculate_fitness(self):
+        
+        for individual in self.population:   
+            individual.fitness = self.evaluate_individual(individual)
 
     def create_mlp_pipeline(self, selected_cols, preprocessador):
         return Pipeline([
@@ -153,9 +162,10 @@ class Model:
         self.population = sorted(self.population, key=lambda p: p.fitness)
         self.population_op.apply_probability(self.population, self.s)
 
+        num_crossover = int(self.n_population * (self.crossing_prob / 100))
         # ================= LOOP EVOLUTIVO =================
         while self.generations < self.max_generations:
-            print("Generation:", self.generations + 1)
+            print("(", self.model, ")", " Generation:", self.generations + 1)
 
             new_population = []
 
@@ -164,29 +174,44 @@ class Model:
                 new_population.append(
                     Individual(self.population[-1 - i].chromosome.copy())
                 )
+            
+            while len(new_population) < self.n_population:
 
-            # 🔹 Reprodução
-            for _ in range(int((self.n_population - self.elitism_number) / 2)):
-                p1 = self.population_op.select_parent(self.population)
-                p2 = self.population_op.select_parent(self.population)
+                
 
-                f1, f2 = self.population_op.generate_offspring(
-                    p1, p2, self.crossing_prob
-                )
+                if len(new_population) < num_crossover:
 
-                self.population_op.apply_mutation(f1, self.mutation_prob)
-                self.population_op.apply_mutation(f2, self.mutation_prob)
+                    # 🔹 Reprodução
+                    p1 = self.population_op.select_parent(self.population)
+                    p2 = self.population_op.select_parent(self.population)
 
-                new_population.append(f1)
-                new_population.append(f2)
+                    f1, f2 = self.population_op.generate_offspring(
+                        p1, p2
+                    )
 
+                    self.population_op.apply_mutation(f1, self.mutation_prob)
+                    self.population_op.apply_mutation(f2, self.mutation_prob)
+
+                    new_population.append(f1)
+                    new_population.append(f2)
+                elif len(new_population) < self.n_population - 2:
+                    parent1 = self.population_op.select_parent(self.population)
+                    chroms = self.linkage.mutation_ll(parent1)
+                    new_population.extend([Individual(c) for c in chroms])
+                else:
+                    parent1 = self.population_op.select_parent(self.population)
+                    child = Individual(parent1.chromosome.copy())
+                    self.population_op.apply_mutation(child, self.mutation_prob)
+                    new_population.append(child)
+                    
+
+            self.generations += 1    
             self.population = new_population
-
             self.calculate_fitness()
             self.population = sorted(self.population, key=lambda p: p.fitness)
             self.population_op.apply_probability(self.population, self.s)
 
-            self.generations += 1
+            
 
         # ================= MELHOR INDIVÍDUO =================
         best = self.population[-1]
@@ -211,10 +236,4 @@ class Model:
         pipeline.fit(self.X_train, self.y_train)
         score = pipeline.score(self.X_test, self.y_test)
 
-        # ================= RESULTADOS =================
-        print(f"\n{self.model.upper()} Attributes:\n")
-        self.print_selected_attributes(best.chromosome, self.X_train)
-
-        print("\nScore:", score, "\n")
-
-        return best, score, pipeline
+        return best, score, pipeline, self.importance, self.evig
