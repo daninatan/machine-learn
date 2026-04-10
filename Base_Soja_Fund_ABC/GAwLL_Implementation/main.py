@@ -134,6 +134,6 @@ if __name__ == "__main__":
 
         print(f"\n{m.upper()}:\n")
         print_importance_sorted(max_importance, list(X_train.columns))
-        print_top_interactions(max_interaction, list(X_train.columns))
+        print_top_interactions(max_interaction, list(X_train.columns), 20)
         print_selected_attributes(best, X_train)
         print("\nScore:", score, "\n\n")

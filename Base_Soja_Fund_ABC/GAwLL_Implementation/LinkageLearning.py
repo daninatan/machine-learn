@@ -3,25 +3,11 @@ from typing import List
 import numpy as np
 
 class LinkageLearning:
-    """
-    Implements Linkage Learning mechanisms to estimate variable interactions.
-
-    By analyzing performance changes when specific genes (g, h) are flipped,
-    this class builds an empirical model of the search space's topology.
-    """
-
     def __init__(self, evig, importance, eval_perf_batch):
-        """
-        Initializes the Linkage Learning module.
 
-        Args:
-            evig: Instance of eVIG to store interactions.
-            importance: Instance of Importance to store variable impact.
-            eval_perf_batch: Callable that evaluates a batch of chromosomes.
-        """
         self.evig = evig
         self.importance = importance
-        self.eval_perf = eval_perf_batch
+        self.eval_perf = eval_perf_batch #to evaluate individuals
 
     def update_linkage_model(self, g: int, h: int, fx: float, fxg: float, fxh: float, fxgh: float) -> None:
         """
