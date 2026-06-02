@@ -27,7 +27,7 @@ def run_model(model_name, config_ga, data, dbConfig, return_dict):
         importance=importance,
     )
 
-    best, score, pipeline, importance, evig = model.run_ag()
+    best, score, importance, evig = model.run_ag()
     return_dict[model_name] = (best.chromosome, score, importance, evig)
 
 
@@ -95,7 +95,7 @@ if __name__ == "__main__":
         exit()
 
     # ================= DATABASE =================
-    dbConfig = DatabaseConfig("/home/daniel/dev/ic/Base_Soja_Fund_ABC/Base_ABC_Flor-Colheita.csv")
+    dbConfig = DatabaseConfig("/home/daniel/dev/ic/Imagens_Espectrais/Tabela_Espectros.csv")
     X_train, X_test, y_train, y_test, base_abc_X = dbConfig.configDatabase()
 
     # ================= CONFIG GA =================
@@ -150,7 +150,7 @@ if __name__ == "__main__":
         max_interaction, min_interaction = evig.export_interaction_matrix()
 
         print(f"\n{m.upper()}:\n")
-        print_importance_sorted(max_importance, min_importance, list(X_train.columns))
+        #print_importance_sorted(max_importance, min_importance, list(X_train.columns))
         #print_top_interactions(max_interaction, min_interaction, list(X_train.columns), 20)
-        #print_selected_attributes(best, X_train)
+        print_selected_attributes(best, X_train)
         print("\nScore:", score, "\n\n")

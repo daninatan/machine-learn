@@ -1,12 +1,12 @@
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import cross_val_score
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.neural_network import MLPRegressor
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.tree import DecisionTreeRegressor
+from sklearn.tree import DecisionTreeClassifier
 from FeatureSelector import FeatureSelector
 from Individual import Individual
 import numpy as np
@@ -36,41 +36,13 @@ class Model:
             col for col, bit in zip(all_columns, chromosome)
             if bit == 1
         ]
-    
-    def build_preprocessor(self, selected_columns):
-
-        num_cols = [c for c in self.dbConfig.getNumericas() if c in selected_columns]
-        cat_cols = [c for c in self.dbConfig.getCategoricas() if c in selected_columns]
-
-        transformers = []
-
-        if num_cols:
-            transformers.append((
-                "num",
-                Pipeline([
-                    ('imputer', SimpleImputer(strategy='mean'))
-                ]),
-                num_cols
-            ))
-
-        if cat_cols:
-            transformers.append((
-                "cat",
-                Pipeline([
-                    ('imputer', SimpleImputer(strategy='most_frequent')),
-                    ('onehot', OneHotEncoder(handle_unknown='ignore'))
-                ]),
-                cat_cols
-            ))
-
-        return ColumnTransformer(transformers)
 
     def evaluate_individual(self, individual : Individual):
         selected_cols = self.chromosome_to_columns(
                 individual.chromosome,
                 self.X_train.columns
         )
-
+        
         PIPELINES = {
             "mlp": (self.create_mlp_pipeline, 3),
             "knn": (self.create_knn_pipeline, 3),
@@ -80,14 +52,13 @@ class Model:
 
         create_pipeline, cv = PIPELINES[self.model]
 
-        preprocessador = self.build_preprocessor(selected_cols)
-
-        pipeline = create_pipeline(selected_cols, preprocessador)
+        pipeline = create_pipeline(selected_cols)
 
         scores = cross_val_score(
             pipeline,
             self.X_train,
             self.y_train,
+            scoring='accuracy',
             cv=cv,
             n_jobs = 1
         )
@@ -109,38 +80,34 @@ class Model:
         for individual in self.population:   
             individual.fitness = self.evaluate_individual(individual)
 
-    def create_mlp_pipeline(self, selected_cols, preprocessador):
+    def create_mlp_pipeline(self, selected_cols):
         return Pipeline([
             ('selector', FeatureSelector(selected_cols)),
-            ('preprocessamento', preprocessador),
             ('scaler', StandardScaler(with_mean=False)),
-            ('regressor', MLPRegressor(
+            ('classifier', MLPClassifier(
                 hidden_layer_sizes=(32,),
                 max_iter=150,
                 early_stopping=True,
             ))
         ])
     
-    def create_knn_pipeline(self, selected_cols, preprocessador):
+    def create_knn_pipeline(self, selected_cols):
         return Pipeline([
             ('selector', FeatureSelector(selected_cols)),
-            ('preprocessamento', preprocessador),
             ('scaler', StandardScaler(with_mean=False)),
-            ('regressor', KNeighborsRegressor(n_jobs=1))
+            ('classifier', KNeighborsClassifier(n_jobs=1))
         ])
     
-    def create_dt_pipeline(self, selected_cols, preprocessador):
+    def create_dt_pipeline(self, selected_cols):
         return Pipeline([
             ('selector', FeatureSelector(selected_cols)),
-            ('preprocessamento', preprocessador),
-            ('regressor', DecisionTreeRegressor())
+            ('classifier', DecisionTreeClassifier())
         ])
     
-    def create_rf_pipeline(self, selected_cols, preprocessador):
+    def create_rf_pipeline(self, selected_cols):
         return Pipeline([
             ('selector', FeatureSelector(selected_cols)),
-            ('preprocessamento', preprocessador),
-            ('regressor', RandomForestRegressor(
+            ('classifier', RandomForestClassifier(
                 n_estimators=30,
                 max_depth=10,
                 min_samples_leaf=5,
@@ -221,8 +188,6 @@ class Model:
             self.X_train.columns
         )
 
-        preprocessador = self.build_preprocessor(selected_cols)
-
         PIPELINES = {
             "mlp": self.create_mlp_pipeline,
             "knn": self.create_knn_pipeline,
@@ -230,10 +195,10 @@ class Model:
             "rf": self.create_rf_pipeline,
         }
 
-        pipeline = PIPELINES[self.model](selected_cols, preprocessador)
+        pipeline = PIPELINES[self.model](selected_cols)
 
         # ================= TREINO FINAL =================
         pipeline.fit(self.X_train, self.y_train)
         score = pipeline.score(self.X_test, self.y_test)
 
-        return best, score, pipeline, self.importance, self.evig
+        return best, score, self.importance, self.evig
